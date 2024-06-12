@@ -1,0 +1,97 @@
+import speech_recognition as sr
+import openai
+import pyttsx3
+import tkinter as tk
+from tkinter import scrolledtext, ttk
+
+# Initialize recognizer
+r = sr.Recognizer()
+
+# OpenAI API key
+openai.api_key = "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"
+
+# Create a professional GUI
+root = tk.Tk()
+root.title("Speech to ChatGPT")
+root.geometry("600x450")  # Adjusted height for better layout
+
+# Create a frame for better organization
+frame = ttk.Frame(root, padding="10")
+frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+
+# Create a label for instructions
+label = ttk.Label(frame, text="Click the button and speak", font=("Helvetica", 14), foreground="blue")
+label.grid(row=0, column=0, columnspan=2, pady=(0, 10))
+
+# Create a scrolled text widget for displaying speech and ChatGPT responses
+text_widget = scrolledtext.ScrolledText(frame, wrap=tk.WORD, width=50, height=10, font=("Helvetica", 12))
+text_widget.grid(row=1, column=0, columnspan=2, pady=(0, 10))
+
+# Function to process speech and generate ChatGPT response
+def process_speech():
+    while True:
+        with sr.Microphone() as source:
+            # Adjust for ambient noise
+            r.adjust_for_ambient_noise(source)
+            label.config(text="Listening...")
+
+            # Listen for audio
+            try:
+                audio = r.listen(source, timeout=5)
+                label.config(text="Processing...")
+            except sr.WaitTimeoutError:
+                label.config(text="Timeout: No speech detected")
+                return
+
+        try:
+            # Convert speech to text
+            text = r.recognize_google(audio)
+            print(f"You said: {text}")
+
+            # Send text to ChatGPT
+            response = openai.Completion.create(
+                model="text-davinci-003",
+                prompt=text,
+                temperature=0.7,
+                max_tokens=256
+            )
+
+            # Get ChatGPT output
+            chatgpt_output = response["choices"][0]["text"]
+            print(f"ChatGPT response: {chatgpt_output}")
+
+            # Display user's speech and ChatGPT response in the Text widget
+            text_widget.insert(tk.END, f"You said: {text}\n")
+            text_widget.insert(tk.END, f"ChatGPT response: {chatgpt_output}\n")
+            text_widget.yview(tk.END)  # Automatically scroll to the end
+
+            # Convert text to speech
+            engine = pyttsx3.init()
+            engine.setProperty("rate", 150)
+            engine.setProperty("volume", 1)
+            engine.say(chatgpt_output)
+            engine.runAndWait()
+
+        except sr.UnknownValueError:
+            print("Could not understand audio")
+            text_widget.insert(tk.END, "Could not understand audio\n")
+        except sr.RequestError as e:
+            print(f"Could not request results from Google Speech Recognition service; {e}")
+            text_widget.insert(tk.END, f"Error: {e}\n")
+
+        label.config(text="Click the button and speak")
+
+# Create a button to trigger speech processing
+button = ttk.Button(frame, text="Speak", command=process_speech, style="TButton")
+button.grid(row=2, column=0, pady=(10, 0), padx=(5, 5))  # Added padding and style
+
+# Create a button to clear the text widget
+clear_button = ttk.Button(frame, text="Clear", command=lambda: text_widget.delete(1.0, tk.END), style="TButton")
+clear_button.grid(row=2, column=1, pady=(10, 0), padx=(5, 5))  # Added padding and style
+
+# Add status bar
+status_bar = ttk.Label(root, text="", relief=tk.SUNKEN, anchor=tk.W)
+status_bar.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.S))
+
+# Run the GUI
+root.mainloop()
